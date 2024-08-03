@@ -1,0 +1,66 @@
+import tensorflow as tf
+import numpy as np
+import pyaudio
+import librosa
+
+# Load pre-trained model
+model_path = "C:\Users\thula\PycharmProjects\pythonProject3\keras_model.h5"  # Update this path to your model file
+try:
+    model = tf.keras.models.load_model(model_path)
+    print(f"Model loaded successfully from {model_path}")
+except OSError as e:
+    print(f"Error loading model: {e}")
+    exit(1)
+
+# Audio recording parameters
+FORMAT = pyaudio.paInt16
+CHANNELS = 1
+RATE = 44100
+CHUNK = 1024
+RECORD_SECONDS = 2
+
+audio = pyaudio.PyAudio()
+
+def record_audio():
+    stream = audio.open(format=FORMAT, channels=CHANNELS,
+                        rate=RATE, input=True,
+                        frames_per_buffer=CHUNK)
+    print("Recording...")
+    frames = []
+
+    for _ in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+        data = stream.read(CHUNK)
+        frames.append(data)
+
+    print("Finished recording.")
+    stream.stop_stream()
+    stream.close()
+    return b''.join(frames)
+
+def preprocess_audio(audio_data):
+    # Convert bytes to numpy array
+    audio_array = np.frombuffer(audio_data, dtype=np.int16)
+    # Convert to float32
+    audio_array = audio_array.astype(np.float32)
+    # Normalize
+    audio_array = audio_array / np.max(np.abs(audio_array))
+    return audio_array
+
+def predict_audio(audio_data):
+    audio_array = preprocess_audio(audio_data)
+    # Use librosa to extract features
+    mfccs = librosa.feature.mfcc(y=audio_array, sr=RATE, n_mfcc=40)
+    mfccs = np.mean(mfccs.T, axis=0)
+    mfccs = np.expand_dims(mfccs, axis=0)
+    prediction = model.predict(mfccs)
+    return prediction
+
+# Label map (change this according to your model's classes)
+labels = ['Voice 1', 'Voice 2', 'Voice 3']  # Replace with your actual labels
+
+# Response map
+responses = {
+    'Voice 1': "Hello, Voice 1! How can I help you today?",
+    'Voice 2': "Hi, Voice 2! What do you need?",
+    'Voice 3': "Greetings, Voice 3! What's up?"
+}
